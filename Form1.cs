@@ -26,11 +26,22 @@ namespace DesktopIconsApp
 
         private void button1_Click(object sender, EventArgs e)
         {
+            listBox1.ForeColor = Color.Lime;
+            listBox1.Items.Clear();
             IntPtr handle = Class1.GetSysListView32();
-            listBox1.Items.Add(handle.ToInt32().ToString("X8"));
+            listBox1.Items.Add("Desktop ListView Handle: " + handle.ToInt32().ToString("X8"));
             int count = Class1.GetDesktopItemCount(handle);
-            listBox1.Items.Add(count.ToString());
+            listBox1.Items.Add("Item count: " + count.ToString());
         }
 
+        private void button2_Click(object sender, EventArgs e)
+        {
+            listBox1.Items.Clear();
+            listBox1.ForeColor = Color.Cyan;
+            List<string> lstDesktopItems = Class1.GetDesktopItemTextList();
+            foreach (var item in lstDesktopItems)
+                listBox1.Items.Add(item);
+            MessageBox.Show(lstDesktopItems.Count.ToString());
+        }
     }
 }
