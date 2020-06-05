@@ -89,7 +89,7 @@ namespace DesktopIconsApp
             
             IntPtr memLoc = VirtualAllocEx(handleX, IntPtr.Zero, 0x1000, AllocationType.Commit, MemoryProtection.ReadWrite);
 
-            
+            byte[] vBuffer = new byte[0x200];
 
             for (int i = 0; i < itemCount; i++)
             {
@@ -105,11 +105,15 @@ namespace DesktopIconsApp
                 // copy unmanaged struct to the target process
                 WriteProcessMemory(handleX, memLoc, lvItemLocalPtr, (uint)lvItemSize, IntPtr.Zero);
 
-                IntPtr response = SendMessage(handleListView, MessageConst.LVM_GETITEMA, i, memLoc);
+                IntPtr response = SendMessage(handleListView, MessageConst.LVM_GETITEMW, i, memLoc);
 
-                LogText("Response #" + (i + 1) + " " + response.ToString());
+                // read updated item from target processs
+                ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), (uint)Marshal.SizeOf(lvItem), IntPtr.Zero);
+                lvItem = (LVITEMA)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), typeof(LVITEMA));
 
-                string str = ReadString(handleX, strBuffer, 0x100);
+                LogText(String.Format("Response #{0} : {1} | {2} {3}", i + 1, response, strBuffer.ToString("X8"), lvItem.pszText.ToString("X8"))); ;
+                
+                string str = ReadString(handleX, lvItem.pszText, 0x100);
                 lstItems.Add(str);
 
                 Marshal.FreeHGlobal(lvItemLocalPtr);
