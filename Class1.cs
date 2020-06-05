@@ -111,7 +111,7 @@ namespace DesktopIconsApp
                 ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), (uint)Marshal.SizeOf(lvItem), IntPtr.Zero);
                 lvItem = (LVITEMA)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), typeof(LVITEMA));
 
-                LogText(String.Format("Response #{0} : {1} | {2} {3}", i + 1, response, strBuffer.ToString("X8"), lvItem.pszText.ToString("X8"))); ;
+                //LogText(String.Format("Response #{0} : {1} | {2} {3}", i + 1, response, strBuffer.ToString("X8"), lvItem.pszText.ToString("X8")));
                 
                 string str = ReadString(handleX, lvItem.pszText, 0x100);
                 lstItems.Add(str);

@@ -22,6 +22,7 @@ namespace DesktopIconsApp
             InitializeComponent();
             mainForm = this;
             listbox = listBox1;
+            Text += IntPtr.Size == 8 ? " 64-bit" : " 32-bit";
         }
 
         private void button1_Click(object sender, EventArgs e)
