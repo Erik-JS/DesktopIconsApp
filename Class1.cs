@@ -93,9 +93,7 @@ namespace DesktopIconsApp
 
             for (int i = 0; i < itemCount; i++)
             {
-                var strBuffer = VirtualAllocEx(handleX, IntPtr.Zero, 0x200, AllocationType.Commit, MemoryProtection.ReadWrite);
-
-                LVITEMA lvItem = new LVITEMA { mask = 1, iItem = i, iSubItem = 0, pszText = strBuffer, cchTextMax = 0x100 };
+                LVITEMA lvItem = new LVITEMA { mask = 1, iItem = i, iSubItem = 0, pszText = memLoc + 0x300, cchTextMax = 0x100 };
 
                 var lvItemSize = Marshal.SizeOf(lvItem);
                 // alloc mem for unmanaged obj
@@ -117,11 +115,9 @@ namespace DesktopIconsApp
                 lstItems.Add(str);
 
                 Marshal.FreeHGlobal(lvItemLocalPtr);
-                VirtualFreeEx(handleX, strBuffer, 0x200, AllocationType.Release);
             }
 
-
-            VirtualFreeEx(handleX, memLoc, 0x1000, AllocationType.Release);
+            VirtualFreeEx(handleX, memLoc, 0, AllocationType.Release);
             CloseHandle(handleX);
             return lstItems;
         }
@@ -163,6 +159,57 @@ namespace DesktopIconsApp
             public IntPtr piColFmt; // int*
             public int iGroup;
         }
+
+
+        public static List<string> GetDesktopItemPositionList()
+        {
+            var lstPositions = new List<string>();
+            IntPtr handleListView = GetSysListView32();
+            int itemCount = GetDesktopItemCount(handleListView);
+            GetWindowThreadProcessId(handleListView, out uint pid);
+            IntPtr handleX = OpenProcess(ProcessAccessFlags.All, false, pid);
+            if (handleX == IntPtr.Zero)
+            {
+                LogText("*** OpenProcess failed ***");
+                return lstPositions;
+            }
+
+            IntPtr memLoc = VirtualAllocEx(handleX, IntPtr.Zero, 0x1000, AllocationType.Commit, MemoryProtection.ReadWrite);
+            byte[] vBuffer = new byte[0x200];
+            for (int i = 0; i < itemCount; i++)
+            {
+                POINT pp = new POINT();
+                var pointVarSize = Marshal.SizeOf(pp);
+                // alloc mem for unmanaged obj
+                var pointUnmanagedPtr = Marshal.AllocHGlobal(pointVarSize);
+                // copy struct to unmanaged space
+                Marshal.StructureToPtr(pp, pointUnmanagedPtr, false);
+                // copy unmanaged struct to the target process
+                WriteProcessMemory(handleX, memLoc, pointUnmanagedPtr, (uint)pointVarSize, IntPtr.Zero);
+
+                SendMessage(handleListView, MessageConst.LVM_GETITEMPOSITION, i, memLoc);
+
+                ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), (uint)Marshal.SizeOf(pp), IntPtr.Zero);
+                pp = (POINT)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), typeof(POINT));
+
+                lstPositions.Add(String.Format("{0:D2} X={1:D4} Y={2:D4}", i + 1, pp.X, pp.Y));
+
+                Marshal.FreeHGlobal(pointUnmanagedPtr);
+
+            }
+
+            VirtualFreeEx(handleX, memLoc, 0, AllocationType.Release);
+            CloseHandle(handleX);
+            return lstPositions;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
 
     }
 }

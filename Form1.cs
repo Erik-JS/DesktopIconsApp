@@ -42,7 +42,17 @@ namespace DesktopIconsApp
             List<string> lstDesktopItems = Class1.GetDesktopItemTextList();
             foreach (var item in lstDesktopItems)
                 listBox1.Items.Add(item);
-            MessageBox.Show(lstDesktopItems.Count.ToString());
+            System.Diagnostics.Debug.Print("lstDesktopItems.Count: " + lstDesktopItems.Count.ToString());
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            listBox1.Items.Clear();
+            listBox1.ForeColor = Color.Yellow;
+            List<string> lstPositions = Class1.GetDesktopItemPositionList();
+            foreach (var pos in lstPositions)
+                listBox1.Items.Add(pos);
+            System.Diagnostics.Debug.Print("lstPositions.Count: " + lstPositions.Count.ToString());
         }
     }
 }
