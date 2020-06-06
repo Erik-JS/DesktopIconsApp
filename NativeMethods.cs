@@ -1,14 +1,36 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace DesktopIconsApp
 {
-    class MemoryStuff
+    static class NativeMethods
     {
+
+        public const uint LVM_GETITEMCOUNT = 4100;
+        public const uint LVM_GETITEMW = 4171;
+        public const uint LVM_GETITEMPOSITION = 4112;
+        public const uint LVIF_TEXT = 1;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, int wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetShellWindow();
 
         [DllImport("user32.dll")]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -16,6 +38,7 @@ namespace DesktopIconsApp
         [DllImport("kernel32.dll")]
         public static extern IntPtr OpenProcess(ProcessAccessFlags processAccess, bool bInheritHandle, uint processId);
 
+        [Flags]
         public enum ProcessAccessFlags : uint
         {
             All = 0x001F0FFF,
@@ -39,8 +62,8 @@ namespace DesktopIconsApp
         [DllImport("kernel32.dll")]
         public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, IntPtr lpBuffer, uint dwSize, IntPtr lpNumberOfBytesRead);
 
-        //[DllImport("kernel32.dll")]
-        //public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, IntPtr lpNumberOfBytesWritten);
+        [DllImport("kernel32.dll")]
+        public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, IntPtr lpNumberOfBytesWritten);
 
         [DllImport("kernel32.dll")]
         public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, IntPtr lpBuffer, uint dwSize, IntPtr lpNumberOfBytesWritten);
@@ -55,7 +78,7 @@ namespace DesktopIconsApp
         public static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, AllocationType dwFreeType);
 
         [Flags]
-        public enum AllocationType
+        public enum AllocationType : uint
         {
             Commit = 0x1000,
             Reserve = 0x2000,
@@ -69,7 +92,7 @@ namespace DesktopIconsApp
         }
 
         [Flags]
-        public enum MemoryProtection
+        public enum MemoryProtection : uint
         {
             Execute = 0x10,
             ExecuteRead = 0x20,
@@ -83,5 +106,33 @@ namespace DesktopIconsApp
             NoCacheModifierflag = 0x200,
             WriteCombineModifierflag = 0x400
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LVITEMA
+        {
+            public uint mask;
+            public int iItem;
+            public int iSubItem;
+            public uint state;
+            public uint stateMask;
+            public IntPtr pszText; // LPSTR
+            public int cchTextMax;
+            public int iImage;
+            public IntPtr lParam; // LPARAM 
+            public int iIndent;
+            public int iGroupId;
+            public uint cColumns;
+            public UIntPtr puColumns; // PUINT
+            public IntPtr piColFmt; // int*
+            public int iGroup;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
     }
 }

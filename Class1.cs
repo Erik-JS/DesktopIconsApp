@@ -6,32 +6,12 @@ using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static DesktopIconsApp.MemoryStuff;
+using static DesktopIconsApp.NativeMethods;
 
 namespace DesktopIconsApp
 {
     class Class1
     {
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        public static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
-
-        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-        [DllImport("user32.dll")]
-        static extern IntPtr GetShellWindow();
-
 
         public static IntPtr GetSysListView32()
         {
@@ -59,7 +39,7 @@ namespace DesktopIconsApp
 
         public static int GetDesktopItemCount(IntPtr desktopListViewHandle)
         {
-            IntPtr iconccount = SendMessage(desktopListViewHandle, MessageConst.LVM_GETITEMCOUNT, 0, IntPtr.Zero);
+            IntPtr iconccount = SendMessage(desktopListViewHandle, LVM_GETITEMCOUNT, 0, IntPtr.Zero);
             return iconccount.ToInt32();
         }
 
@@ -74,28 +54,27 @@ namespace DesktopIconsApp
         public static List<string> GetDesktopItemTextList()
         {
             List<string> lstItems = new List<string>();
-
+            int MaxChar = 0x100;
             IntPtr handleListView = GetSysListView32();
             int itemCount = GetDesktopItemCount(handleListView);
-
             GetWindowThreadProcessId(handleListView, out uint pid);
-
             IntPtr handleX = OpenProcess(ProcessAccessFlags.All, false, pid);
             if(handleX==IntPtr.Zero)
             {
                 LogText("*** OpenProcess failed ***");
                 return lstItems;
             }
-            
-            IntPtr memLoc = VirtualAllocEx(handleX, IntPtr.Zero, 0x1000, AllocationType.Commit, MemoryProtection.ReadWrite);
 
-            byte[] vBuffer = new byte[0x200];
+            IntPtr memLoc = VirtualAllocEx(handleX, IntPtr.Zero, 0x1000, AllocationType.Commit, MemoryProtection.ReadWrite);
+            LVITEMA lvItem = new LVITEMA() { mask = LVIF_TEXT, iSubItem = 0, cchTextMax = MaxChar } ;
+            int lvItemSize = Marshal.SizeOf(lvItem);
+            byte[] itemBuffer = new byte[lvItemSize];
 
             for (int i = 0; i < itemCount; i++)
             {
-                LVITEMA lvItem = new LVITEMA { mask = 1, iItem = i, iSubItem = 0, pszText = memLoc + 0x300, cchTextMax = 0x100 };
+                lvItem.iItem = i;
+                lvItem.pszText = memLoc + 0x300;
 
-                var lvItemSize = Marshal.SizeOf(lvItem);
                 // alloc mem for unmanaged obj
                 var lvItemLocalPtr = Marshal.AllocHGlobal(lvItemSize);
                 // copy struct to unmanaged space
@@ -103,15 +82,13 @@ namespace DesktopIconsApp
                 // copy unmanaged struct to the target process
                 WriteProcessMemory(handleX, memLoc, lvItemLocalPtr, (uint)lvItemSize, IntPtr.Zero);
 
-                IntPtr response = SendMessage(handleListView, MessageConst.LVM_GETITEMW, i, memLoc);
+                SendMessage(handleListView, LVM_GETITEMW, i, memLoc);
 
                 // read updated item from target processs
-                ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), (uint)Marshal.SizeOf(lvItem), IntPtr.Zero);
-                lvItem = (LVITEMA)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), typeof(LVITEMA));
-
-                //LogText(String.Format("Response #{0} : {1} | {2} {3}", i + 1, response, strBuffer.ToString("X8"), lvItem.pszText.ToString("X8")));
-                
-                string str = ReadString(handleX, lvItem.pszText, 0x100);
+                ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(itemBuffer, 0), (uint)lvItemSize, IntPtr.Zero);
+                lvItem = (LVITEMA)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(itemBuffer, 0), typeof(LVITEMA));
+                //LogText(String.Format("Response #{0} : {1} | {2} {3}", i + 1, response, strBuffer.ToString("X8"), lvItem.pszText.ToString("X8")));                              
+                string str = ReadString(handleX, lvItem.pszText, MaxChar);
                 lstItems.Add(str);
 
                 Marshal.FreeHGlobal(lvItemLocalPtr);
@@ -139,28 +116,6 @@ namespace DesktopIconsApp
             return str;
         }
 
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct LVITEMA
-        {
-            public uint mask;
-            public int iItem;
-            public int iSubItem;
-            public uint state;
-            public uint stateMask;
-            public IntPtr pszText; // LPSTR
-            public int cchTextMax;
-            public int iImage;
-            public IntPtr lParam; // LPARAM 
-            public int iIndent;
-            public int iGroupId;
-            public uint cColumns;
-            public UIntPtr puColumns; // PUINT
-            public IntPtr piColFmt; // int*
-            public int iGroup;
-        }
-
-
         public static List<string> GetDesktopItemPositionList()
         {
             var lstPositions = new List<string>();
@@ -175,11 +130,12 @@ namespace DesktopIconsApp
             }
 
             IntPtr memLoc = VirtualAllocEx(handleX, IntPtr.Zero, 0x1000, AllocationType.Commit, MemoryProtection.ReadWrite);
-            byte[] vBuffer = new byte[0x200];
+            POINT pp = new POINT();
+            int pointVarSize = Marshal.SizeOf(pp);
+            byte[] pBuffer = new byte[pointVarSize];
+
             for (int i = 0; i < itemCount; i++)
             {
-                POINT pp = new POINT();
-                var pointVarSize = Marshal.SizeOf(pp);
                 // alloc mem for unmanaged obj
                 var pointUnmanagedPtr = Marshal.AllocHGlobal(pointVarSize);
                 // copy struct to unmanaged space
@@ -187,29 +143,19 @@ namespace DesktopIconsApp
                 // copy unmanaged struct to the target process
                 WriteProcessMemory(handleX, memLoc, pointUnmanagedPtr, (uint)pointVarSize, IntPtr.Zero);
 
-                SendMessage(handleListView, MessageConst.LVM_GETITEMPOSITION, i, memLoc);
+                SendMessage(handleListView, LVM_GETITEMPOSITION, i, memLoc);
 
-                ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), (uint)Marshal.SizeOf(pp), IntPtr.Zero);
-                pp = (POINT)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(vBuffer, 0), typeof(POINT));
-
+                ReadProcessMemory(handleX, memLoc, Marshal.UnsafeAddrOfPinnedArrayElement(pBuffer, 0), (uint)pointVarSize, IntPtr.Zero);
+                pp = (POINT)Marshal.PtrToStructure(Marshal.UnsafeAddrOfPinnedArrayElement(pBuffer, 0), typeof(POINT));
                 lstPositions.Add(String.Format("{0:D2} X={1:D4} Y={2:D4}", i + 1, pp.X, pp.Y));
 
                 Marshal.FreeHGlobal(pointUnmanagedPtr);
-
             }
 
             VirtualFreeEx(handleX, memLoc, 0, AllocationType.Release);
             CloseHandle(handleX);
             return lstPositions;
         }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct POINT
-        {
-            public int X;
-            public int Y;
-        }
-
 
     }
 }
